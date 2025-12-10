@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="newtab.css">
+</head>
+<body>
+  <!-- Theme Select -->
+  <div class="theme-select-wrapper">
+    <select id="theme-select" class="theme-select">
+      <option value="auto">Auto</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </div>
+
+  <div class="dashboard">
+    <!-- Left Panel: Clock & Search -->
+    <section class="panel-left">
+      <div class="clock-wrapper">
+        <div id="clock" class="clock">
+          <div id="clock-time" class="clock-time"></div>
+          <div id="clock-date" class="clock-date"></div>
+        </div>
+        <div id="weather" class="weather"></div>
+      </div>
+      <div class="search-wrapper">
+        <input type="text" id="search-input" placeholder="検索...">
+      </div>
+      <div class="shortcuts-wrapper">
+        <div id="shortcuts" class="shortcuts"></div>
+      </div>
+    </section>
+
+    <!-- Center Panel: Calendar -->
+    <section class="panel-center">
+      <div class="month-calendar" id="month-calendar"></div>
+    </section>
+
+    <!-- Right Panel: Events -->
+    <section class="panel-right">
+      <h2 class="section-title">スケジュール</h2>
+      <div id="calendar-events"></div>
+    </section>
+  </div>
+
+  <!-- Event Detail Modal -->
+  <div id="event-modal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close" aria-label="閉じる">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Shortcut Edit Modal -->
+  <div id="shortcut-modal" class="modal">
+    <div class="modal-content shortcut-modal-content">
+      <button class="modal-close" id="shortcut-modal-close" aria-label="閉じる">&times;</button>
+      <h3 class="shortcut-modal-title" id="shortcut-modal-title">ショートカットを追加</h3>
+      <form id="shortcut-form">
+        <div class="shortcut-form-group">
+          <label for="shortcut-title">タイトル</label>
+          <input type="text" id="shortcut-title" placeholder="例: Google" required>
+        </div>
+        <div class="shortcut-form-group">
+          <label for="shortcut-url">URL</label>
+          <input type="url" id="shortcut-url" placeholder="例: https://google.com" required>
+        </div>
+        <div class="shortcut-form-actions">
+          <button type="button" id="shortcut-delete" class="shortcut-btn-delete">削除</button>
+          <button type="submit" class="shortcut-btn-save">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="newtab.js"></script>
+</body>
+</html>
