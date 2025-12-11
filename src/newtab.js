@@ -381,7 +381,14 @@ elements.monthCalendar.addEventListener('click', (e) => {
   // 日付クリック
   const dayEl = target.closest('.day.clickable');
   if (dayEl?.dataset.date) {
-    showDayEvents(dayEl.dataset.date);
+    // 今日の日付をクリックした場合は「今日に戻る」と同じ動作
+    if (dayEl.classList.contains('today')) {
+      currentMonth = new Date();
+      renderMonthCalendar();
+      refreshTodayTomorrowEvents();
+    } else {
+      showDayEvents(dayEl.dataset.date);
+    }
   }
 });
 

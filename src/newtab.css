@@ -12,9 +12,9 @@
 
 /* Dark mode variables */
 :root {
-  --bg-gradient: linear-gradient(135deg, #0a0a12 0%, #0f1624 40%, #0d1a2d 70%, #0a1628 100%);
+  --bg-gradient: linear-gradient(135deg, #0a1628 0%, #1a365d 40%, #234e82 60%, #1a365d 100%);
   --bg-panel: rgba(255, 255, 255, 0.02);
-  --bg-modal: #12121a;
+  --bg-modal: #2d2d2d;
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.6);
   --text-muted: rgba(255, 255, 255, 0.35);
@@ -31,7 +31,7 @@
 
 /* Light mode variables */
 [data-theme="light"] {
-  --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 40%, #dce3ed 70%, #e8ecf4 100%);
+  --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e8f4f8 40%, #f0e6ef 70%, #faf5f5 100%);
   --bg-panel: rgba(0, 0, 0, 0.02);
   --bg-modal: #ffffff;
   --text-primary: #1a1a2e;
@@ -51,7 +51,7 @@
 /* OS light mode preference (when no manual override) */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 40%, #dce3ed 70%, #e8ecf4 100%);
+    --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e8f4f8 40%, #f0e6ef 70%, #faf5f5 100%);
     --bg-panel: rgba(0, 0, 0, 0.02);
     --bg-modal: #ffffff;
     --text-primary: #1a1a2e;
@@ -140,7 +140,7 @@ body {
   flex-direction: column;
   justify-content: center;
   padding: 3rem;
-  padding-left: 5rem;
+  padding-left: 8rem;
   padding-bottom: 8rem;
   border-right: 1px solid var(--divider);
 }
@@ -658,9 +658,9 @@ body {
 .modal-content {
   background: var(--bg-modal);
   border: 1px solid var(--divider);
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 420px;
+  border-radius: 16px;
+  padding: 2.5rem;
+  max-width: 500px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
@@ -669,8 +669,8 @@ body {
 
 .modal-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 1.5rem;
+  right: 1.5rem;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -761,6 +761,7 @@ body {
 
   .panel-left {
     padding: 2rem;
+    padding-left: 4rem;
     padding-bottom: 6rem;
   }
 
