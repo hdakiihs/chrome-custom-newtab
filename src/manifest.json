@@ -10,6 +10,15 @@
     "service_worker": "background.js"
   },
   "permissions": ["search", "identity", "storage"],
+  "icons": {
+    "128": "icon.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "oauth2": {
     "client_id": "73716285342-dkacu9k7tfb9pbib6n7fnsu0llk6306j.apps.googleusercontent.com",
     "scopes": ["https://www.googleapis.com/auth/calendar.readonly"]
