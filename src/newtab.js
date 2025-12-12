@@ -249,16 +249,32 @@ function updateClock() {
 }
 
 // 終了したイベントを終了済み表示に更新、進行中のイベントをハイライト
+// 最適化: イベント要素をキャッシュして、状態変更があるもののみ更新
+let cachedEventElements = [];
+let lastEventUpdateTime = 0;
+
 function updatePastEvents(now) {
   // currentDisplayedEventsがまだ初期化されていない場合はスキップ
   if (typeof currentDisplayedEvents === 'undefined' || !currentDisplayedEvents.length) return;
 
   const nowTime = now.getTime();
+
+  // 最適化: 要素キャッシュが空の場合のみ再取得
+  if (cachedEventElements.length === 0) {
+    cachedEventElements = Array.from(document.querySelectorAll('.event-item[data-event-index]'));
+  }
+
+  // 最適化: 状態が変わる可能性のあるイベントのみチェック
   currentDisplayedEvents.forEach((event, index) => {
     if (!event.end?.dateTime) return; // 終日イベントはスキップ
+
     const eventStart = event.start.dateTime ? new Date(event.start.dateTime).getTime() : null;
     const eventEnd = new Date(event.end.dateTime).getTime();
-    const eventEl = document.querySelector(`.event-item[data-event-index="${index}"]`);
+
+    // 最適化: 現在時刻の前後のイベントのみ処理
+    if (nowTime < eventStart - 60000 || nowTime > eventEnd + 60000) return;
+
+    const eventEl = cachedEventElements[index];
     if (!eventEl) return;
 
     if (nowTime >= eventEnd) {
@@ -659,8 +675,13 @@ async function fetchCalendarList(retried = false) {
   }
 }
 
-async function fetchEventsFromCalendars(params, retried = false) {
-  const eventPromises = cachedCalendars.map(async (calendar) => {
+// 最適化: リトライ時は失敗したカレンダーのみ再取得
+async function fetchEventsFromCalendars(params, retried = false, failedIndices = null) {
+  const calendarsToFetch = failedIndices
+    ? failedIndices.map(i => ({ calendar: cachedCalendars[i], index: i }))
+    : cachedCalendars.map((calendar, index) => ({ calendar, index }));
+
+  const eventPromises = calendarsToFetch.map(async ({ calendar, index }) => {
     try {
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events?${params}`,
@@ -669,36 +690,44 @@ async function fetchEventsFromCalendars(params, retried = false) {
 
       // 401エラーの場合、トークンを再取得してリトライ
       if (response.status === 401 && !retried) {
-        await refreshAuthToken();
-        return null; // リトライが必要
+        return { success: false, index, retry: true };
       }
 
       const data = await response.json();
 
       if (response.ok && data.items) {
-        return data.items.map(event => ({
-          ...event,
-          calendarColor: calendar.backgroundColor || '#4285f4',
-          calendarName: calendar.summary || ''
-        }));
+        return {
+          success: true,
+          index,
+          events: data.items.map(event => ({
+            ...event,
+            calendarColor: calendar.backgroundColor || '#4285f4',
+            calendarName: calendar.summary || ''
+          }))
+        };
       }
-      return [];
+      return { success: true, index, events: [] };
     } catch (e) {
       console.warn('Failed to fetch events:', e);
-      // ネットワークエラーの場合、リトライが必要かもしれない
-      if (!retried) return null;
-      return [];
+      return { success: false, index, retry: !retried };
     }
   });
 
-  const eventsArrays = await Promise.all(eventPromises);
+  const results = await Promise.all(eventPromises);
 
-  // リトライが必要な場合
-  if (eventsArrays.includes(null) && !retried) {
-    return fetchEventsFromCalendars(params, true);
+  // リトライが必要なカレンダーを特定
+  const needsRetry = results.filter(r => r.retry);
+  if (needsRetry.length > 0 && !retried) {
+    await refreshAuthToken();
+    const retryIndices = needsRetry.map(r => r.index);
+    const retryResults = await fetchEventsFromCalendars(params, true, retryIndices);
+
+    // 成功した結果とリトライ結果をマージ
+    const successResults = results.filter(r => r.success);
+    return sortEventsByTime([...successResults, ...retryResults].flatMap(r => r.events || []));
   }
 
-  return sortEventsByTime(eventsArrays.filter(arr => arr !== null).flat());
+  return sortEventsByTime(results.filter(r => r.success).flatMap(r => r.events || []));
 }
 
 function createEventParams(startOfDay, endOfDay) {
@@ -751,6 +780,7 @@ function displayEvents(events, startOfDay) {
   if (events.length === 0) {
     setCalendarMessage('予定はありません', 'no-events');
     currentDisplayedEvents = [];
+    cachedEventElements = []; // キャッシュクリア
     return;
   }
 
@@ -795,6 +825,7 @@ function displayEvents(events, startOfDay) {
   html += '</div>';
 
   elements.calendarEvents.innerHTML = html;
+  cachedEventElements = []; // 新しいDOM要素なのでキャッシュクリア
 }
 
 // 現在時刻のラインを含めてイベントを描画
@@ -1116,10 +1147,14 @@ elements.modalClose.addEventListener('click', hideEventModal);
 elements.eventModal.addEventListener('click', (e) => {
   if (e.target === elements.eventModal) hideEventModal();
 });
+// 最適化: Escapeキーイベントは頻繁に発火しないのでpassiveは不要だが、早期リターンで最適化
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    hideEventModal();
-    hideShortcutModal();
+    if (elements.eventModal.classList.contains('show')) {
+      hideEventModal();
+    } else if (elements.shortcutModal.classList.contains('show')) {
+      hideShortcutModal();
+    }
   }
 });
 
@@ -1154,38 +1189,79 @@ function getInitial(title) {
   return title ? title.charAt(0).toUpperCase() : '?';
 }
 
-function renderShortcuts() {
-  let html = shortcuts.map((shortcut, index) => {
-    const faviconUrl = getFaviconUrl(shortcut.url);
-    const iconContent = faviconUrl
-      ? `<img src="${faviconUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">`
-      : '';
-    const placeholder = `<span class="shortcut-icon-placeholder" ${faviconUrl ? 'style="display:none"' : ''}>${getInitial(shortcut.title)}</span>`;
+// 最適化: 差分更新でDOM操作を最小化
+let lastShortcutsState = [];
 
-    return `
-      <div class="shortcut-item" data-index="${index}" data-url="${escapeHtml(shortcut.url)}">
-        <div class="shortcut-icon">
-          ${iconContent}
-          ${placeholder}
-        </div>
-        <span class="shortcut-title">${escapeHtml(shortcut.title)}</span>
-      </div>
-    `;
-  }).join('');
+function renderShortcuts() {
+  // 最適化: 状態が変わっていない場合はスキップ
+  const currentState = JSON.stringify(shortcuts);
+  if (currentState === JSON.stringify(lastShortcutsState) && elements.shortcuts.children.length > 0) {
+    return;
+  }
+  lastShortcutsState = [...shortcuts];
+
+  // DocumentFragmentを使用してDOM操作を最適化
+  const fragment = document.createDocumentFragment();
+
+  shortcuts.forEach((shortcut, index) => {
+    const item = document.createElement('div');
+    item.className = 'shortcut-item';
+    item.dataset.index = index;
+    item.dataset.url = shortcut.url;
+
+    const icon = document.createElement('div');
+    icon.className = 'shortcut-icon';
+
+    const faviconUrl = getFaviconUrl(shortcut.url);
+    if (faviconUrl) {
+      const img = document.createElement('img');
+      img.src = faviconUrl;
+      img.alt = '';
+      img.onerror = function () {
+        this.style.display = 'none';
+        this.nextElementSibling.style.display = 'block';
+      };
+      icon.appendChild(img);
+    }
+
+    const placeholder = document.createElement('span');
+    placeholder.className = 'shortcut-icon-placeholder';
+    if (faviconUrl) placeholder.style.display = 'none';
+    placeholder.textContent = getInitial(shortcut.title);
+    icon.appendChild(placeholder);
+
+    const title = document.createElement('span');
+    title.className = 'shortcut-title';
+    title.textContent = shortcut.title;
+
+    item.appendChild(icon);
+    item.appendChild(title);
+    fragment.appendChild(item);
+  });
 
   // 上限未満の場合のみ追加ボタンを表示
   if (shortcuts.length < MAX_SHORTCUTS) {
-    html += `
-      <div class="shortcut-item shortcut-add" data-action="add">
-        <div class="shortcut-icon">
-          <span class="shortcut-add-icon">+</span>
-        </div>
-        <span class="shortcut-title">追加</span>
-      </div>
-    `;
+    const addItem = document.createElement('div');
+    addItem.className = 'shortcut-item shortcut-add';
+    addItem.dataset.action = 'add';
+
+    const addIcon = document.createElement('div');
+    addIcon.className = 'shortcut-icon';
+    const addIconSpan = document.createElement('span');
+    addIconSpan.className = 'shortcut-add-icon';
+    addIconSpan.textContent = '+';
+    addIcon.appendChild(addIconSpan);
+
+    const addTitle = document.createElement('span');
+    addTitle.className = 'shortcut-title';
+    addTitle.textContent = '追加';
+
+    addItem.appendChild(addIcon);
+    addItem.appendChild(addTitle);
+    fragment.appendChild(addItem);
   }
 
-  elements.shortcuts.innerHTML = html;
+  elements.shortcuts.replaceChildren(fragment);
 }
 
 // イベント委譲でショートカットのクリック処理を一括で行う
@@ -1296,17 +1372,22 @@ elements.shortcutDelete.addEventListener('click', async () => {
 // ===========================================
 // 初期化 - 並列実行で高速化
 // ===========================================
-loadAllCache().then(() => {
-  loadTheme();
-  loadShortcuts();
-  Promise.all([
-    fetchWeather(),
-    fetchHolidays().then(renderMonthCalendar),
-    fetchCalendarEvents()
-  ]);
+// 最適化: キャッシュ読み込みと並行して即座に実行可能な処理を開始
+loadTheme(); // キャッシュ不要なので即座に実行
 
-  // カレンダーの定期自動更新
-  setInterval(() => {
-    refreshTodayTomorrowEvents();
-  }, CALENDAR_REFRESH_INTERVAL);
+// 最適化: すべての初期化を並列実行
+Promise.all([
+  loadAllCache().then(() => {
+    loadShortcuts();
+  }),
+  fetchWeather(),
+  fetchHolidays().then(renderMonthCalendar),
+  loadAllCache().then(fetchCalendarEvents)
+]).catch(err => {
+  console.error('Initialization error:', err);
 });
+
+// カレンダーの定期自動更新
+setInterval(() => {
+  refreshTodayTomorrowEvents();
+}, CALENDAR_REFRESH_INTERVAL);

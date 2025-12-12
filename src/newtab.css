@@ -333,7 +333,6 @@ body.theme-transition * {
   cursor: pointer;
   transition: background 0.15s;
   text-decoration: none;
-  will-change: background-color;
 }
 
 .shortcut-item:hover {
@@ -551,7 +550,6 @@ body.theme-transition * {
   color: var(--text-secondary);
   border-radius: 50%;
   transition: background 0.15s;
-  will-change: background-color;
 }
 
 .day.clickable {
@@ -621,7 +619,6 @@ body.theme-transition * {
   padding: 0.625rem 0;
   cursor: pointer;
   transition: opacity 0.3s ease;
-  will-change: opacity;
 }
 
 .event-item:hover {
@@ -710,7 +707,6 @@ body.theme-transition * {
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  will-change: opacity;
 }
 
 .modal.show {
